@@ -66,12 +66,13 @@ def start_end_date(root_earndate_expirydate4_lst):
               # forward_dates=dates>earn_date   # RED
               if len(lesser_dates)==0:
                  print(f"lesser dates not found for symbol{symbol} expiry date{exp_date} earndate{earn_date} ")
-                 start_date=earn_date
+                 return "no data found" 
               else:
                  start_date=lesser_dates[-1]                 
               if len(greater_dates)==0:
-                 print(f"greater dates not found for symbol{symbol} expiry date{exp_date} earndate{earn_date} ")
-                 end_date=earn_date 
+                 print(f"greater dates not found for symbol{symbol} expiry date{exp_date} earndate{earn_date}")
+                 return "no data found"
+
               else:
                   end_date=greater_dates[0]
                  
@@ -126,7 +127,7 @@ def bulk_ohlc_data(symbol_earndate_expirydate_startdate_enddate_lst):
   return df
 def greeks_data(ohlc_df,symbol_earndate_expirydatelst_startdate_enddate_lst):
     dataframes = []
-    print(symbol_earndate_expirydatelst_startdate_enddate_lst)
+    #print(symbol_earndate_expirydatelst_startdate_enddate_lst)
   
     symbol,earndate,expirydatelst,startdate,enddate=symbol_earndate_expirydatelst_startdate_enddate_lst[0]
    
@@ -178,46 +179,57 @@ def greeks_data(ohlc_df,symbol_earndate_expirydatelst_startdate_enddate_lst):
 
 
 def run(symbol,earning_date):
+        #print(f"{symbol}{earning_date}")
         t1=time.perf_counter()
+        #print(f"code  start at {t1} sec")
  
-        #symbol_earndate_dic=earning_date_with_symbol()
-        symbol_earndate_dic={symbol:[earning_date]}
-       # print("extracted earndate")
+     
+        symbol_earndate_dic={symbol:[str(earning_date)]}
+        #print(f"the symbol an earn date are {symbol_earndate_dic}")
+
         root_earndate_expirydate4_lst=forward4_expdate_dic(symbol_earndate_dic)
-        #print(f"extracted expiry date{root_earndate_expirydate4_lst}")
-        symbol_earndate_expirydatelst_startdate_enddate_lst=start_end_date(root_earndate_expirydate4_lst)
-        #print(" extracted start and end date")
-        #print(f"extracted start end date {symbol_earndate_expirydatelst_startdate_enddate_lst}")
-        ohlc_df=bulk_ohlc_data(symbol_earndate_expirydatelst_startdate_enddate_lst)
-        #print("extracted ohlc data")
-        greek_df=greeks_data(ohlc_df,symbol_earndate_expirydatelst_startdate_enddate_lst)
-        #print("extracted greek data")
+        #print(f"extracted forward 4 expiry{root_earndate_expirydate4_lst}")
 
-        main_df=ohlc_df.merge(greek_df,how='left',on=['ms_of_day','date','contract_root','contract_expiration','contract_strike','contract_right'])
-
+        result=start_end_date(root_earndate_expirydate4_lst)       
+        if result == "no data found":
+          print("Not processing  this case ")
+        else:
+            symbol_earndate_expirydatelst_startdate_enddate_lst=result
+            #print(f"extracted start end date  {symbol_earndate_expirydatelst_startdate_enddate_lst}")
+           
             
-        
-        #display(main_df.head())
-        main_df.to_excel(f"D:\\Thetadata\\earning data\\'{symbol}-{earning_date}'.xlsx",index=False)
+            ohlc_df=bulk_ohlc_data(symbol_earndate_expirydatelst_startdate_enddate_lst)
+            #print("extracted ohlc data")
+
+            greek_df=greeks_data(ohlc_df,symbol_earndate_expirydatelst_startdate_enddate_lst)
+            #print("extracted greek data")
+
+            main_df=ohlc_df.merge(greek_df,how='left',on=['ms_of_day','date','contract_root','contract_expiration','contract_strike','contract_right'])
+            #print("ohlc and greek data merged")
+                
+            
+            #display(main_df.head())
+            main_df.to_excel(f"D:\\Thetadata\\earning data\\'{symbol}-{earning_date}'.xlsx",index=False)
+            #print(f"data converted into excel")
 
         print(f"congratulation you got the output for {symbol}-{earning_date}")
         t2=time.perf_counter()
-        print(f"Elapsed time={t2-t1}")
+        print(f"Elapsed time={(t2-t1)/60}")
 #run('AAPL','20240102')   
 def notcall():
-  with ThreadPoolExecutor(max_workers=10) as executor:
-      filepath = r'C:\Users\user\Downloads\weekly_stk_earnings.xlsx' # change path of file
+  with ThreadPoolExecutor(max_workers=500) as executor:
+      filepath = r'D:\Crewhub data\US stocks earning dates quaterly\df_0.xlsx' # change path of file
 
       df = pd.read_excel(filepath)
-    # Melt the DataFrame
-      df_melted = df.melt(id_vars=['Symbol'], value_name='Earning Date')
+      
+      future = executor.map(run,df['Symbol'],df['Earnings_Date'])
 
-    # Select only the necessary columns
-      df_final = df_melted[['Symbol', 'Earning Date']]
-      df_final['Earning Date'] = pd.to_datetime(df_final['Earning Date']).dt.strftime("%Y%m%d")
-      df_final.sort_values(by='Symbol', inplace=True)
-      df_final=df_final.head(1)
-      future = executor.map(run,df_final['Symbol'],df_final['Earning Date'])
+      
 
-notcall()
+if __name__ == '__main__':
+  start = time.perf_counter()
+  #run('AAPL','20240102')
+  notcall()
+  end = time.perf_counter()
+  print(f"\nTotal elapsed Time df: {round((end-start)/60,2)} min")   
         
